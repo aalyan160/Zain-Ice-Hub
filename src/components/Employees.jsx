@@ -5,20 +5,34 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Employees() {
   const [employees, setEmployees] = useState([]);
+  const [branches, setBranches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [formData, setFormData] = useState({ name: '', pin: '', role: 'staff' });
+  const [formData, setFormData] = useState({ name: '', pin: '', role: 'staff', branch_id: '' });
   const [formError, setFormError] = useState('');
 
   useEffect(() => {
-    fetchEmployees();
+    fetchData();
   }, []);
 
-  const fetchEmployees = async () => {
+  const fetchData = async () => {
     setLoading(true);
-    const { data, error } = await supabase.from('users').select('*').order('created_at', { ascending: false });
-    if (!error && data) {
-      setEmployees(data);
+    try {
+      const { data: empData, error: empErr } = await supabase
+        .from('users')
+        .select('*, branches(name)')
+        .order('created_at', { ascending: false });
+        
+      if (!empErr && empData) setEmployees(empData);
+
+      const { data: branchData, error: branchErr } = await supabase
+        .from('branches')
+        .select('*')
+        .order('name');
+        
+      if (!branchErr && branchData) setBranches(branchData);
+    } catch (err) {
+      console.error(err);
     }
     setLoading(false);
   };
@@ -31,7 +45,19 @@ export default function Employees() {
       return;
     }
 
-    const { error } = await supabase.from('users').insert([formData]);
+    if (formData.role === 'staff' && !formData.branch_id) {
+      setFormError('Please select a branch for the staff member.');
+      return;
+    }
+
+    const payload = {
+      name: formData.name,
+      pin: formData.pin,
+      role: formData.role,
+      branch_id: formData.role === 'staff' ? formData.branch_id : null
+    };
+
+    const { error } = await supabase.from('users').insert([payload]);
     if (error) {
       if (error.code === '23505') {
         setFormError('This PIN is already in use by another user.');
@@ -42,8 +68,8 @@ export default function Employees() {
     }
 
     setShowModal(false);
-    setFormData({ name: '', pin: '', role: 'staff' });
-    fetchEmployees();
+    setFormData({ name: '', pin: '', role: 'staff', branch_id: '' });
+    fetchData();
   };
 
   const handleDelete = async (id, role) => {
@@ -57,7 +83,7 @@ export default function Employees() {
     
     if (window.confirm('Are you sure you want to remove this employee?')) {
       await supabase.from('users').delete().eq('id', id);
-      fetchEmployees();
+      fetchData();
     }
   };
 
@@ -99,15 +125,22 @@ export default function Employees() {
                   </div>
                   <div>
                     <h3 style={{ margin: 0 }}>{emp.name}</h3>
-                    <div className="flex items-center gap-1 mt-1">
+                    <div className="flex items-center gap-1 mt-1 flex-wrap">
                       {emp.role === 'admin' ? (
                         <span style={{ fontSize: '0.75rem', background: 'var(--primary)', color: 'white', padding: '2px 6px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                           <Shield size={10} /> Admin
                         </span>
                       ) : (
-                        <span style={{ fontSize: '0.75rem', background: 'var(--success)', color: 'white', padding: '2px 6px', borderRadius: '4px' }}>
-                          Staff
-                        </span>
+                        <>
+                          <span style={{ fontSize: '0.75rem', background: 'var(--success)', color: 'white', padding: '2px 6px', borderRadius: '4px' }}>
+                            Staff
+                          </span>
+                          {emp.branches?.name && (
+                            <span style={{ fontSize: '0.75rem', background: 'var(--info)', color: 'white', padding: '2px 6px', borderRadius: '4px' }}>
+                              📍 {emp.branches.name}
+                            </span>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
@@ -146,13 +179,30 @@ export default function Employees() {
                 <label>Secret PIN</label>
                 <input required className="input-field" value={formData.pin} onChange={e => setFormData({...formData, pin: e.target.value})} placeholder="4-digit PIN" maxLength={8} />
               </div>
-              <div className="mb-4">
+              <div className="mb-3">
                 <label>Role</label>
-                <select className="input-field" value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})}>
+                <select className="input-field" value={formData.role} onChange={e => setFormData({...formData, role: e.target.value, branch_id: e.target.value === 'admin' ? '' : formData.branch_id})}>
                   <option value="staff">Staff (Can only Sell)</option>
                   <option value="admin">Admin (Full Access)</option>
                 </select>
               </div>
+              
+              {formData.role === 'staff' && (
+                <div className="mb-4">
+                  <label>Assign Branch</label>
+                  <select 
+                    required 
+                    className="input-field" 
+                    value={formData.branch_id} 
+                    onChange={e => setFormData({...formData, branch_id: e.target.value})}
+                  >
+                    <option value="">-- Select Branch --</option>
+                    {branches.map(b => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               
               {formError && <p className="text-danger mb-3" style={{ fontSize: '0.9rem' }}>{formError}</p>}
               
@@ -167,3 +217,4 @@ export default function Employees() {
     </motion.div>
   );
 }
+

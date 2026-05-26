@@ -24,6 +24,7 @@ export default function Register({ user, onShiftOpened }) {
         .from('shifts')
         .insert([{
           user_id: user.id,
+          branch_id: user.branch_id,
           opening_balance: amount
         }])
         .select()

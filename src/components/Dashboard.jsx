@@ -23,6 +23,7 @@ export default function Dashboard() {
   const [closingCash, setClosingCash] = useState('');
   const [shiftSalesTotal, setShiftSalesTotal] = useState(0);
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
+  const [branchName, setBranchName] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -42,6 +43,15 @@ export default function Dashboard() {
       } else {
         const parsed = JSON.parse(sessionUser);
         setUser(parsed);
+        
+        // Fetch branch name if assigned to a branch
+        if (parsed.branch_id) {
+          const { data } = await supabase.from('branches').select('name').eq('id', parsed.branch_id).single();
+          if (data) setBranchName(data.name);
+        } else {
+          setBranchName('');
+        }
+
         // Force staff to products tab if they try to access admin tabs
         if (parsed.role === 'staff' && !['products', 'profile'].includes(activeTab)) {
           setActiveTab('products');
@@ -129,16 +139,16 @@ export default function Dashboard() {
 
     if (user?.role === 'staff') {
       switch (activeTab) {
-        case 'products': return <Products userRole={user.role} shiftId={activeShift?.id} />;
+        case 'products': return <Products userRole={user.role} shiftId={activeShift?.id} userBranchId={user.branch_id} />;
         case 'profile': return <Profile />;
-        default: return <Products userRole={user.role} shiftId={activeShift?.id} />;
+        default: return <Products userRole={user.role} shiftId={activeShift?.id} userBranchId={user.branch_id} />;
       }
     }
 
     // Admin rendering
     switch (activeTab) {
       case 'overview': return <Overview />;
-      case 'products': return <Products userRole={user.role} shiftId={activeShift?.id} />;
+      case 'products': return <Products userRole={user.role} shiftId={activeShift?.id} userBranchId={user.branch_id} />;
       case 'sales': return <Sales />;
       case 'reports': return <Reports />;
       case 'employees': return <Employees />;
@@ -172,7 +182,7 @@ export default function Dashboard() {
             ) : (
               <UserCircle size={32} />
             )}
-            <span style={{ fontWeight: 600 }}>Hello, {user.name}</span>
+            <span style={{ fontWeight: 600 }}>Hello, {user.name} {branchName ? `(${branchName})` : ''}</span>
             {activeShift && user.role === 'staff' && (
               <button onClick={handleOpenCloseRegister} className="btn" style={{ background: 'var(--warning)', color: 'white' }}>
                 <LockKeyhole size={18} /> Close Register
