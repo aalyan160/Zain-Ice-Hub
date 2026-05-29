@@ -326,29 +326,53 @@ export default function Products({ userRole = 'admin', shiftId, userBranchId }) 
 
                   <div className="flex gap-2 mt-4" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
                     {userRole === 'staff' ? (
-                      <div className="flex items-center gap-1">
-                        <input 
-                          type="number" 
-                          min="1" 
-                          className="input-field" 
-                          style={{ width: '70px', padding: '0.5rem', borderRadius: '8px', textAlign: 'center', fontSize: '1.1rem' }}
-                          value={sellQuantities[product.id] !== undefined ? sellQuantities[product.id] : ''}
-                          onChange={(e) => setSellQuantities({...sellQuantities, [product.id]: e.target.value === '' ? '' : parseInt(e.target.value) || ''})}
-                          onFocus={(e) => e.target.select()}
-                          placeholder="Qty"
-                        />
-                        <button 
-                          className="btn btn-sm btn-outline btn-icon-hover" 
-                          onClick={() => {
-                            const qty = parseInt(sellQuantities[product.id]) || 0;
-                            if (qty < 1) { showToast('Please enter quantity', 'error'); return; }
-                            handleSell(product, qty);
-                          }}
-                          disabled={sellingId === product.id}
-                          style={{ opacity: sellingId === product.id ? 0.6 : 1, pointerEvents: sellingId === product.id ? 'none' : 'auto' }}
-                        >
-                          {sellingId === product.id ? '...' : 'Sell'}
-                        </button>
+                      <div style={{ width: '100%' }}>
+                        {/* Quick Sale Buttons */}
+                        <div className="flex gap-2 mb-2" style={{ flexWrap: 'wrap' }}>
+                          {[1, 2, 3, 5, 10].map(qty => (
+                            <button 
+                              key={qty}
+                              className="btn btn-sm btn-primary btn-icon-hover"
+                              onClick={() => handleSell(product, qty)}
+                              disabled={sellingId === product.id || product.stock < qty}
+                              style={{ 
+                                flex: '1', 
+                                minWidth: '45px',
+                                opacity: (sellingId === product.id || product.stock < qty) ? 0.4 : 1,
+                                pointerEvents: (sellingId === product.id || product.stock < qty) ? 'none' : 'auto',
+                                padding: '0.5rem 0.3rem',
+                                fontSize: '0.9rem'
+                              }}
+                            >
+                              +{qty}
+                            </button>
+                          ))}
+                        </div>
+                        {/* Custom Quantity Row */}
+                        <div className="flex items-center gap-1">
+                          <input 
+                            type="number" 
+                            min="1" 
+                            className="input-field" 
+                            style={{ width: '70px', padding: '0.5rem', borderRadius: '8px', textAlign: 'center', fontSize: '1.1rem' }}
+                            value={sellQuantities[product.id] !== undefined ? sellQuantities[product.id] : ''}
+                            onChange={(e) => setSellQuantities({...sellQuantities, [product.id]: e.target.value === '' ? '' : parseInt(e.target.value) || ''})}
+                            onFocus={(e) => e.target.select()}
+                            placeholder="Qty"
+                          />
+                          <button 
+                            className="btn btn-sm btn-outline btn-icon-hover" 
+                            onClick={() => {
+                              const qty = parseInt(sellQuantities[product.id]) || 0;
+                              if (qty < 1) { showToast('Please enter quantity', 'error'); return; }
+                              handleSell(product, qty);
+                            }}
+                            disabled={sellingId === product.id}
+                            style={{ opacity: sellingId === product.id ? 0.6 : 1, pointerEvents: sellingId === product.id ? 'none' : 'auto' }}
+                          >
+                            {sellingId === product.id ? '...' : 'Sell'}
+                          </button>
+                        </div>
                       </div>
                     ) : (
                       <>
