@@ -67,12 +67,14 @@ export default function Products({ userRole = 'admin', shiftId, userBranchId }) 
           stockMap[i.product_id] = i.stock;
         });
         
-        // Embed stock inside products array directly
-        const mappedProducts = fetchedProducts.map(p => ({
-          ...p,
-          stock: stockMap[p.id] || 0
-        }));
-        setProducts(mappedProducts);
+        // Only show products that exist in this branch's inventory
+        const branchProducts = fetchedProducts
+          .filter(p => stockMap[p.id] !== undefined)
+          .map(p => ({
+            ...p,
+            stock: stockMap[p.id]
+          }));
+        setProducts(branchProducts);
       }
     } catch (err) {
       console.error("Error fetching products:", err);
@@ -99,12 +101,14 @@ export default function Products({ userRole = 'admin', shiftId, userBranchId }) 
         productId = data.id;
       }
 
-      // Save branch stocks
-      const upsertData = branches.map(b => ({
-        branch_id: b.id,
-        product_id: productId,
-        stock: Number(branchStocks[b.id] || 0)
-      }));
+      // Save branch stocks (only for branches where admin entered a value)
+      const upsertData = branches
+        .filter(b => branchStocks[b.id] !== undefined && branchStocks[b.id] !== '')
+        .map(b => ({
+          branch_id: b.id,
+          product_id: productId,
+          stock: Number(branchStocks[b.id] || 0)
+        }));
 
       if (upsertData.length > 0) {
         await supabase.from('branch_inventory').upsert(upsertData, { onConflict: 'branch_id,product_id' });
@@ -178,7 +182,7 @@ export default function Products({ userRole = 'admin', shiftId, userBranchId }) 
         p.id === product.id ? { ...p, stock: p.stock - qty } : p
       ));
 
-      setSellQuantities(prev => ({ ...prev, [product.id]: 1 }));
+      setSellQuantities(prev => ({ ...prev, [product.id]: '' }));
       showToast(`Sold ${qty}x ${product.name} — Rs. ${product.price * qty}`, 'success');
     } catch (err) {
       console.error("Sale transaction error:", err);
@@ -327,13 +331,19 @@ export default function Products({ userRole = 'admin', shiftId, userBranchId }) 
                           type="number" 
                           min="1" 
                           className="input-field" 
-                          style={{ width: '60px', padding: '0.4rem', borderRadius: '8px', textAlign: 'center' }}
-                          value={sellQuantities[product.id] || 1}
-                          onChange={(e) => setSellQuantities({...sellQuantities, [product.id]: parseInt(e.target.value) || 1})}
+                          style={{ width: '70px', padding: '0.5rem', borderRadius: '8px', textAlign: 'center', fontSize: '1.1rem' }}
+                          value={sellQuantities[product.id] !== undefined ? sellQuantities[product.id] : ''}
+                          onChange={(e) => setSellQuantities({...sellQuantities, [product.id]: e.target.value === '' ? '' : parseInt(e.target.value) || ''})}
+                          onFocus={(e) => e.target.select()}
+                          placeholder="Qty"
                         />
                         <button 
                           className="btn btn-sm btn-outline btn-icon-hover" 
-                          onClick={() => handleSell(product, sellQuantities[product.id] || 1)}
+                          onClick={() => {
+                            const qty = parseInt(sellQuantities[product.id]) || 0;
+                            if (qty < 1) { showToast('Please enter quantity', 'error'); return; }
+                            handleSell(product, qty);
+                          }}
                           disabled={sellingId === product.id}
                           style={{ opacity: sellingId === product.id ? 0.6 : 1, pointerEvents: sellingId === product.id ? 'none' : 'auto' }}
                         >
@@ -396,17 +406,17 @@ export default function Products({ userRole = 'admin', shiftId, userBranchId }) 
               {/* Enter Branch Stock separate levels */}
               <div className="mb-4" style={{ borderTop: '1px solid var(--card-border)', paddingTop: '1rem' }}>
                 <h4 className="mb-2" style={{ fontSize: '1rem' }}>Branch Stocks</h4>
+                <p className="text-muted mb-2" style={{ fontSize: '0.8rem' }}>Leave empty to skip a branch. Product will only appear in branches where you enter stock.</p>
                 {branches.map(b => (
                   <div className="mb-2" key={b.id}>
                     <label className="text-muted" style={{ fontSize: '0.85rem' }}>{b.name} Stock Level</label>
                     <input 
                       type="number"
-                      required
                       min="0"
                       className="input-field mt-1"
                       value={branchStocks[b.id] !== undefined ? branchStocks[b.id] : ''}
-                      onChange={e => setBranchStocks({...branchStocks, [b.id]: parseInt(e.target.value) || 0})}
-                      placeholder="0"
+                      onChange={e => setBranchStocks({...branchStocks, [b.id]: e.target.value === '' ? undefined : (parseInt(e.target.value) || 0)})}
+                      placeholder="Leave empty to skip"
                     />
                   </div>
                 ))}
